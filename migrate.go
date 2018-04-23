@@ -8,6 +8,7 @@ import (
     "io/ioutil"
     "github.com/go-yaml/yaml"
     "github.com/dazhenghu/migrate/model"
+    "fmt"
 )
 
 type MigrateInterface interface {
@@ -60,8 +61,8 @@ func (self *migrate)ExecUp() error {
     self.db.Find(&migrationLogs).Pluck("version", &versions)
 
     execedVersions := make(map[string]string) // 主要用来借住hash判断version是否已存在，即已执行过
-    for _, item := range migrationLogs {
-        execedVersions[(*item).Version] = ""
+    for _, item := range versions {
+        execedVersions[item] = ""
     }
 
     err = filepath.Walk(self.migrationDirPath, func(path string, info os.FileInfo, err error) error {
@@ -87,13 +88,12 @@ func (self *migrate)ExecUp() error {
 
         migrationInfo := &migration{}
         err = yaml.Unmarshal(migationBytes, migrationInfo)
+
         if err != nil {
             return err
         }
 
-        self.Up(migrationInfo)
-
-        return nil
+        return self.Up(migrationInfo)
     })
 
 
@@ -106,6 +106,7 @@ func (self *migrate)ExecUp() error {
  */
 func (self *migrate)Up(migration *migration) error {
     for _, sql := range migration.UpList {
+        fmt.Printf("exec sql:%s\n", sql)
         err := self.ExecSql(sql)
         if err != nil {
             return err
@@ -120,7 +121,5 @@ func (self *migrate)Up(migration *migration) error {
  */
 func (self *migrate)ExecSql(sql string) error {
 
-    self.db.Exec(sql)
-
-    return nil
+    return self.db.Exec(sql).Error
 }
