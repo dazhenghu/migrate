@@ -9,6 +9,7 @@ import (
     "github.com/go-yaml/yaml"
     "github.com/dazhenghu/migrate/model"
     "fmt"
+    "time"
 )
 
 type MigrateInterface interface {
@@ -65,9 +66,10 @@ func (self *migrate)ExecUp() error {
         execedVersions[item] = ""
     }
 
-    err = filepath.Walk(self.migrationDirPath, func(path string, info os.FileInfo, err error) error {
+    err = filepath.Walk(self.migrationDirPath, func(path string, info os.FileInfo, err error) (errRet error) {
         if info == nil || os.IsNotExist(err) {
-            return err
+            errRet = err
+            return
         }
 
         if info.IsDir() {
@@ -81,19 +83,41 @@ func (self *migrate)ExecUp() error {
             return nil
         }
 
-        migationBytes, err := ioutil.ReadFile(path)
-        if err != nil {
-            return err
+        migationBytes, errRet := ioutil.ReadFile(path)
+        if errRet != nil {
+            return
         }
 
         migrationInfo := &migration{}
-        err = yaml.Unmarshal(migationBytes, migrationInfo)
+        errRet = yaml.Unmarshal(migationBytes, migrationInfo)
 
-        if err != nil {
-            return err
+        if errRet != nil {
+            return
         }
 
-        return self.Up(migrationInfo)
+        // 事务处理
+        self.db.Begin()
+        defer func() {
+            rec := recover()
+            if rec != nil {
+                errRet = rec.(error)
+                self.db.Rollback()
+                return
+            }
+
+            self.db.Commit()
+        }()
+
+        // 执行UP语句
+        self.Up(migrationInfo)
+
+        // 更新执行记录
+        migrationLog := &model.MigrationLog{
+            Version: info.Name(),
+            CreateAt: time.Now(),
+        }
+        errRet = self.db.Save(migrationLog).Error
+        return
     })
 
 
@@ -104,12 +128,13 @@ func (self *migrate)ExecUp() error {
 /**
 执行migration的up操作
  */
-func (self *migrate)Up(migration *migration) error {
+func (self *migrate)Up(migration *migration) (err error) {
     for _, sql := range migration.UpList {
         fmt.Printf("exec sql:%s\n", sql)
-        err := self.ExecSql(sql)
+        err = self.ExecSql(sql)
         if err != nil {
-            return err
+            panic(err)
+            return
         }
     }
 
