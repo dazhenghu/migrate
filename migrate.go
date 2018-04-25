@@ -10,6 +10,8 @@ import (
     "github.com/dazhenghu/migrate/model"
     "fmt"
     "time"
+    "strings"
+    "errors"
 )
 
 type MigrateInterface interface {
@@ -17,16 +19,25 @@ type MigrateInterface interface {
     Down() (error)
 }
 
+type DbConf struct {
+    Dsn string
+}
+
+
 type migrate struct {
     db *gorm.DB  // 数据库连接
     migrationDirPath string // 需执行migrate的目录
     migrateProcess MigrateInterface // 执行操作
+    dbConfMap map[string]DbConf // 数据库连接配置map，key:配置名，DbConf:数据库连接配置
+    dbConnBuff map[string]*gorm.DB // 数据库连接
 }
 
 func New(db *gorm.DB, migrationDirPath string) *migrate  {
     return &migrate{
         db:db,
         migrationDirPath:migrationDirPath,
+        dbConfMap: make(map[string]DbConf),
+        dbConnBuff: make(map[string]*gorm.DB),
     }
 }
 
@@ -45,6 +56,13 @@ func InitSelf(db *gorm.DB) {
 
         db.Exec(sql)
     }
+}
+
+/**
+添加db配置到confmap中
+ */
+func (self *migrate)PushDbConf(confName string, conf DbConf)  {
+    self.dbConfMap[confName] = conf
 }
 
 /**
@@ -95,6 +113,23 @@ func (self *migrate)ExecUp() error {
             return
         }
 
+        // 先从缓存中获取数据库连接，没有的话再建立链接
+        dbConn, ok := self.dbConnBuff[migrationInfo.DbIndex]
+        if !ok {
+            dbconf, confOk := self.dbConfMap[migrationInfo.DbIndex]
+            if !confOk {
+                errRet = errors.New(fmt.Sprintf("migration err, undefined dbconf index:%s", migrationInfo.DbIndex))
+                return
+            }
+
+            dbConn, errRet = gorm.Open("mysql", dbconf.Dsn)
+            if errRet != nil {
+                return
+            }
+            self.dbConnBuff[migrationInfo.DbIndex] = dbConn
+        }
+
+
         // 事务处理
         self.db.Begin()
         defer func() {
@@ -120,7 +155,13 @@ func (self *migrate)ExecUp() error {
         return
     })
 
-
+    defer func() {
+        for _, dbConn := range self.dbConnBuff  {
+            if dbConn != nil {
+                dbConn.Close()
+            }
+        }
+    }()
 
     return err
 }
@@ -147,4 +188,29 @@ func (self *migrate)Up(migration *migration) (err error) {
 func (self *migrate)ExecSql(sql string) error {
 
     return self.db.Exec(sql).Error
+}
+
+
+/**
+控制台命令生成migration文件
+ */
+func (self *migrate)CreateMigrationFile()  {
+    fmt.Println("Please input file name:")
+    var fileName string
+    fmt.Scanln(&fileName)
+
+    fileName = GenerateMigrationFileName(fileName) + ".yaml" // 增加前缀
+
+    fmt.Println("Create new migration:" + fileName + " (y|n)")
+
+    var yn string
+    fmt.Scanln(&yn)
+
+    yn = strings.ToUpper(yn)
+
+    if yn == "Y" {
+        // 创建文件
+        err := GenerateMigrationFile(self.migrationDirPath, fileName, []string{}, []string{})
+        fmt.Printf("err:%+v", err)
+    }
 }

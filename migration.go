@@ -12,6 +12,7 @@ import (
 用于构建执行migrate操作的数据结构
  */
 type migration struct {
+    DbIndex string `yaml:"dbindex"` // db配置key值
     UpList []string `yaml:"up,flow"`     // up操作执行的sql列表
     DownList []string `yaml:"down,flow"` // down操作执行的sql列表
 }
