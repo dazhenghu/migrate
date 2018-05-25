@@ -14,6 +14,8 @@ import (
     "errors"
 )
 
+var defaultDbIndex string = "db"
+
 type MigrateInterface interface {
     Up() (error)
     Down() (error)
@@ -33,12 +35,14 @@ type migrate struct {
 }
 
 func New(db *gorm.DB, migrationDirPath string) *migrate  {
-    return &migrate{
+    obj := &migrate{
         db:db,
         migrationDirPath:migrationDirPath,
         dbConfMap: make(map[string]DbConf),
         dbConnBuff: make(map[string]*gorm.DB),
     }
+    obj.dbConnBuff[defaultDbIndex] = db
+    return obj
 }
 
 /**
@@ -111,6 +115,10 @@ func (self *migrate)ExecUp() error {
 
         if errRet != nil {
             return
+        }
+
+        if migrationInfo.DbIndex == "" {
+            migrationInfo.DbIndex = defaultDbIndex
         }
 
         // 先从缓存中获取数据库连接，没有的话再建立链接
@@ -194,7 +202,7 @@ func (self *migrate)ExecSql(sql string) error {
 /**
 控制台命令生成migration文件
  */
-func (self *migrate)CreateMigrationFile()  {
+func CreateMigrationFile(migrationDirPath string)  {
     fmt.Println("Please input file name:")
     var fileName string
     fmt.Scanln(&fileName)
@@ -210,7 +218,7 @@ func (self *migrate)CreateMigrationFile()  {
 
     if yn == "Y" {
         // 创建文件
-        err := GenerateMigrationFile(self.migrationDirPath, fileName, []string{}, []string{})
+        err := GenerateMigrationFile(migrationDirPath, fileName, []string{}, []string{})
         fmt.Printf("err:%+v", err)
     }
 }
