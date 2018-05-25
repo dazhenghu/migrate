@@ -30,7 +30,7 @@ type migrate struct {
     db *gorm.DB  // 数据库连接
     migrationDirPath string // 需执行migrate的目录
     migrateProcess MigrateInterface // 执行操作
-    dbConfMap map[string]DbConf // 数据库连接配置map，key:配置名，DbConf:数据库连接配置
+    dbConfMap map[string]*DbConf // 数据库连接配置map，key:配置名，DbConf:数据库连接配置
     dbConnBuff map[string]*gorm.DB // 数据库连接
 }
 
@@ -38,7 +38,7 @@ func New(db *gorm.DB, migrationDirPath string) *migrate  {
     obj := &migrate{
         db:db,
         migrationDirPath:migrationDirPath,
-        dbConfMap: make(map[string]DbConf),
+        dbConfMap: make(map[string]*DbConf),
         dbConnBuff: make(map[string]*gorm.DB),
     }
     obj.dbConnBuff[defaultDbIndex] = db
@@ -65,7 +65,7 @@ func (self *migrate)InitSelf() {
 /**
 添加db配置到confmap中
  */
-func (self *migrate)PushDbConf(confName string, conf DbConf)  {
+func (self *migrate)PushDbConf(confName string, conf *DbConf)  {
     self.dbConfMap[confName] = conf
 }
 
