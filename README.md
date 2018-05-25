@@ -21,7 +21,16 @@ migrateObj := migrate.New(db, "./migration")
 // 此句是执行migration文件中up所指定的sql
 err = migrateObj.ExecUp()
 ```
-
+```
+// 创建migration文件
+var fileName string
+fmt.Scanln(&fileName)
+fmt.Println("将使用如下命名文件:" + migrate.GenerateMigrationFileName(fileName)+"(y|n)")
+var yn string
+fmt.Scanln(&yn)
+fmt.Println("选择的结果为：" + yn)
+migrateObj.CreateMigrationFile()
+```
 
 
 

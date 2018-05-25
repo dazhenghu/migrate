@@ -44,8 +44,8 @@ func New(db *gorm.DB, migrationDirPath string) *migrate  {
 /**
 初始化migrate模块自身所需资源
  */
-func InitSelf(db *gorm.DB) {
-    has := db.HasTable("migration_log")
+func (self *migrate)InitSelf() {
+    has := self.db.HasTable("migration_log")
 
     if !has {
         sql := "CREATE TABLE `migration_log` (" +
@@ -54,7 +54,7 @@ func InitSelf(db *gorm.DB) {
             "PRIMARY KEY (`version`)" +
             ") ENGINE=InnoDB DEFAULT CHARSET=utf8;"
 
-        db.Exec(sql)
+        self.db.Exec(sql)
     }
 }
 
