@@ -144,6 +144,7 @@ func (self *migrate)ExecUp() error {
             rec := recover()
             if rec != nil {
                 errRet = rec.(error)
+                fmt.Printf("sql err:%+v\n", errRet)
                 self.db.Rollback()
                 return
             }
