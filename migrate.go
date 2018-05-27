@@ -158,21 +158,21 @@ func (self *migrate)ExecUp() error {
 
 
         // 事务处理
-        self.db.Begin()
-        defer func() {
+        dbConn.Begin()
+        defer func(conn *gorm.DB) {
             rec := recover()
             if rec != nil {
                 errRet = rec.(error)
                 fmt.Printf("sql err:%+v\n", errRet)
-                self.db.Rollback()
+                conn.Rollback()
                 return
             }
 
-            self.db.Commit()
-        }()
+            conn.Commit()
+        }(dbConn)
 
         // 执行UP语句
-        self.Up(migrationInfo)
+        self.Up(dbConn, migrationInfo)
 
         // 更新执行记录
         migrationLog := &model.MigrationLog{
@@ -197,10 +197,10 @@ func (self *migrate)ExecUp() error {
 /**
 执行migration的up操作
  */
-func (self *migrate)Up(migration *migration) (err error) {
+func (self *migrate)Up(conn *gorm.DB, migration *migration) (err error) {
     for _, sql := range migration.UpList {
         fmt.Printf("exec sql:%s\n", sql)
-        err = self.ExecSql(sql)
+        err = self.ExecSql(conn, sql)
         if err != nil {
             panic(err)
             return
@@ -213,9 +213,9 @@ func (self *migrate)Up(migration *migration) (err error) {
 /**
 执行sql
  */
-func (self *migrate)ExecSql(sql string) error {
+func (self *migrate)ExecSql(conn *gorm.DB, sql string) error {
 
-    return self.db.Exec(sql).Error
+    return conn.Exec(sql).Error
 }
 
 
