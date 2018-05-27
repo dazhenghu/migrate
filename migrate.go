@@ -57,7 +57,10 @@ func New(migrationDirPath string, dbconfigMap map[string]*DbConf) *migrate  {
         dbConfMap: dbconfigMap,
         dbConnBuff: make(map[string]*gorm.DB),
     }
-
+    if defaultDb != nil {
+        // 将默认链接加到缓存中
+        obj.dbConnBuff[defaultDbIndex] = defaultDb
+    }
     return obj
 }
 
