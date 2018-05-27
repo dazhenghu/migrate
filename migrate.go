@@ -22,7 +22,8 @@ type MigrateInterface interface {
 }
 
 type DbConf struct {
-    Dsn string
+    Type string  // 数据库类型，如：mysql
+    Dsn  string  // 数据库连接
 }
 
 
@@ -34,14 +35,29 @@ type migrate struct {
     dbConnBuff map[string]*gorm.DB // 数据库连接
 }
 
-func New(db *gorm.DB, migrationDirPath string) *migrate  {
+func New(migrationDirPath string, dbconfigMap map[string]*DbConf) *migrate  {
+    if dbconfigMap == nil {
+        dbconfigMap = make(map[string]*DbConf)
+    }
+
+    var defaultDb *gorm.DB
+    for key, conf := range dbconfigMap {
+        if key == defaultDbIndex {
+            db, err := gorm.Open(conf.Type, conf.Dsn)
+            if err != nil {
+                panic(err)
+            }
+            defaultDb = db
+        }
+    }
+
     obj := &migrate{
-        db:db,
+        db:defaultDb,
         migrationDirPath:migrationDirPath,
-        dbConfMap: make(map[string]*DbConf),
+        dbConfMap: dbconfigMap,
         dbConnBuff: make(map[string]*gorm.DB),
     }
-    obj.dbConnBuff[defaultDbIndex] = db
+
     return obj
 }
 
