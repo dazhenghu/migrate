@@ -72,9 +72,11 @@ func (self *migrate)InitSelf() {
 
     if !has {
         sql := "CREATE TABLE `migration_log` (" +
+            "`id` int(11) unsigned NOT NULL AUTO_INCREMENT COMMENT 'id'," +
             "`version` varchar(180) NOT NULL, " +
             "`create_at` datetime DEFAULT NULL, " +
-            "PRIMARY KEY (`version`)" +
+            "PRIMARY KEY (`id`)," +
+            "KEY idx_version (`version`)" +
             ") ENGINE=InnoDB DEFAULT CHARSET=utf8;"
 
         self.db.Exec(sql)
@@ -158,30 +160,26 @@ func (self *migrate)ExecUp() error {
 
 
         // 事务处理
-        dbConn.Begin()
-        //defer func(conn *gorm.DB) {
-        //    rec := recover()
-        //    if rec != nil {
-        //        errRet = rec.(error)
-        //        fmt.Printf("sql err:%+v\n", errRet)
-        //        conn.Rollback()
-        //        return
-        //    }
-        //
-        //    conn.Commit()
-        //}(dbConn)
+        tx := dbConn.Begin()
+        defer func(conn *gorm.DB) {
+            rec := recover()
+            if rec != nil {
+                errRet = rec.(error)
+                fmt.Printf("sql err:%+v\n", errRet)
+                conn.Rollback()
+                return
+            }
+
+            conn.Commit()
+        }(tx)
 
         // 执行UP语句
-        errRet = self.Up(dbConn, migrationInfo)
+        errRet = self.Up(tx, migrationInfo)
 
         if errRet != nil {
-            fmt.Printf("sql err:%+v\n", errRet)
-            dbConn.Rollback()
+            panic(fmt.Sprintf("sql err:%+s\n", errRet.Error()))
             return
         }
-
-        fmt.Printf("sql commit\n")
-        dbConn.Commit()
 
         // 更新执行记录
         migrationLog := &model.MigrationLog{
@@ -189,6 +187,9 @@ func (self *migrate)ExecUp() error {
             CreateAt: time.Now(),
         }
         errRet = self.db.Save(migrationLog).Error
+        if errRet != nil {
+            panic(fmt.Sprintf("MigrationLog save err:%s", errRet.Error()))
+        }
         return
     })
 
