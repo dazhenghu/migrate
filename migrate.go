@@ -180,6 +180,7 @@ func (self *migrate)ExecUp() error {
             return
         }
 
+        fmt.Printf("sql commit\n")
         dbConn.Commit()
 
         // 更新执行记录
